@@ -10,7 +10,9 @@ class PQTNode:
         self.p = 0.
 
     def __str__(self):
-        return "Node {}x{} \t{} points {} children".format(self.coords[0], self.coords[1], len(self.contents), len(self.children))
+        if self.children:
+           print(self.children)
+        return "[{:.3},{:.3}]x[{:.3},{:.3}] ".format(self.coords[0][0], self.coords[0][1], self.coords[1][0], self.coords[1][1]) + "{} pts {} chldrn".format(len(self.contents), len(self.children))
 
     def __repr__(self):
         return "PQTNode({}, {})".format(self.coords[0], self.coords[1])
@@ -47,10 +49,9 @@ class PQTDecomposition:
     def from_points(self, points=[], p_hat=0.1, store_pts=True):
         n_pts = float(len(points))
         # Check that atoms do not have probability higher than p_hat, if they
-        # are then we set p_hat to something slightly bigger than this value.
+        # are then we set p_hat to the probability of an atom.
         atom_p = 1./n_pts
         self.p_hat = atom_p if (atom_p > p_hat) else p_hat
-
 
         def gen_pqt(node, pts):
             node.p = len(pts)/n_pts
@@ -63,18 +64,48 @@ class PQTDecomposition:
                 # the cell
                 for child in node.children:
                     gen_pqt(child, [pt for pt in pts if child.contains(pt)])
-                return
-
-            # Otherwise the node is a leaf, so add it
-            self.leaves.append(node)
-            # Store points if set
-            if store_pts:
-                node.contents = pts
+            else:
+                # Otherwise the node is a leaf, so add it
+                self.leaves.append(node)
+                # Store points if set
+                if store_pts:
+                    node.contents = pts
 
         # Start recursion through the root node
         gen_pqt(self.root, points)
         return self
 
+    def from_pdf(self, pdf, p_hat, verbose=False):
+        from scipy.integrate import nquad
+
+        self.p_hat = p_hat
+
+        def gen_pqt(node, n_proc, n_total):
+            # Compute the probability over the cell
+            node.p,_ = nquad(pdf, node.coords)
+
+            # We now process another node
+            n_proc += 1
+
+            if verbose and n_proc % 100 == 0:
+                print("{}/{}".format(n_proc, n_total))
+
+            # If the probability is too high then split the cell and generate
+            # sub-trees
+            if node.p >= p_hat:
+                node.split()
+                for child in node.children:
+                    # Adding new nodes to be processed
+                    n_total += 1
+                    gen_pqt(child, n_proc, n_total)
+            else:
+                # Otherwise the node is a leaf
+                self.leaves.append(node)
+
+        gen_pqt(self.root, 0, 1)
+        return self
+
+            
     def __ref__(self):
         return "PQTDecomposition()"
 
@@ -103,10 +134,13 @@ class PQTDecomposition:
         
 
 if __name__ == "__main__":
-    import random
-    n_pts = 1000 
-    pts = [(random.random(), random.random()) for i in xrange(n_pts)]
-    decomp = PQTDecomposition().from_points(pts, p_hat=0.05)
-    
-    map(print, decomp.leaves)
+    #import random
+    #n_pts = 1000 
+    #pts = [(random.random(), random.random()) for i in xrange(n_pts)]
+
+    #decomp = PQTDecomposition().from_points(pts, p_hat=0.05)
+    def pdf(x, y):
+        return 3 * (1 - x**2 - y**2)
+    decomp = PQTDecomposition().from_pdf(pdf, p_hat=0.01, verbose=True)
+    print(decomp)
 
