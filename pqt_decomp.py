@@ -1,25 +1,28 @@
 from __future__ import print_function
 import numpy as np
 
+
 class PQTNode:
     """PQT Node class"""
-    def __init__(self, coords=[[0., 1.], [0., 1.]]):
+    def __init__(self, bounds=[[0., 1.], [0., 1.]]):
         self.children = []
-        self.coords = coords
-        self.contents = []
+        self.bounds = bounds 
+        self.content = []
         self.p = 0.
 
     def __str__(self):
-        if self.children:
-           print(self.children)
-        return "[{:.3},{:.3}]x[{:.3},{:.3}] ".format(self.coords[0][0], self.coords[0][1], self.coords[1][0], self.coords[1][1]) + "{} pts {} chldrn".format(len(self.contents), len(self.children))
+        return "[{:.3},{:.3}]x[{:.3},{:.3}] ".format(self.bounds[0][0],
+                                                     self.bounds[0][1],
+                                                     self.bounds[1][0],
+                                                     self.bounds[1][1]) \
+              + "{} pts {} chldrn {:.3} prb".format(len(self.content), len(self.children), self.p)
 
     def __repr__(self):
-        return "PQTNode({}, {})".format(self.coords[0], self.coords[1])
+        return "PQTNode({}, {})".format(self.bounds[0], self.bounds[1])
 
     def split(self):
-        x0, x1 = self.coords[0]
-        y0, y1 = self.coords[1]
+        x0, x1 = self.bounds[0]
+        y0, y1 = self.bounds[1]
 
         xc, yc = 0.5*(x0+x1), 0.5*(y0+y1)
 
@@ -32,12 +35,15 @@ class PQTNode:
                 ]
         return self.children
 
-    def contains(self, coord=[0.5,0.5]):
-        x0, x1 = self.coords[0]
-        y0, y1 = self.coords[1]
+    def encloses(self, coord=[0.5,0.5]):
+        x0, x1 = self.bounds[0]
+        y0, y1 = self.bounds[1]
 
         return x0 <= coord[0] < x1 \
            and y0 <= coord[1] < y1
+
+    def contains(self, coord=[0.1, 0.1]):
+        return coord in self.content
 
 
 class PQTDecomposition:
@@ -46,7 +52,7 @@ class PQTDecomposition:
         self.root = PQTNode()
         self.leaves = []
 
-    def from_points(self, points=[], p_hat=0.1, store_pts=True):
+    def from_points(self, points=[], p_hat=0.1, store=False):
         n_pts = float(len(points))
         # Check that atoms do not have probability higher than p_hat, if they
         # are then we set p_hat to the probability of an atom.
@@ -63,46 +69,38 @@ class PQTDecomposition:
                 # For each new node, generate from all points that fall inside
                 # the cell
                 for child in node.children:
-                    gen_pqt(child, [pt for pt in pts if child.contains(pt)])
+                    gen_pqt(child, [pt for pt in pts if child.encloses(pt)])
             else:
                 # Otherwise the node is a leaf, so add it
                 self.leaves.append(node)
                 # Store points if set
-                if store_pts:
-                    node.contents = pts
+                if store:
+                    node.content = pts
 
         # Start recursion through the root node
         gen_pqt(self.root, points)
         return self
 
-    def from_pdf(self, pdf, p_hat, verbose=False):
+    def from_pdf(self, pdf, p_hat):
         from scipy.integrate import nquad
 
         self.p_hat = p_hat
 
-        def gen_pqt(node, n_proc, n_total):
+        def gen_pqt(node):
             # Compute the probability over the cell
-            node.p,_ = nquad(pdf, node.coords)
-
-            # We now process another node
-            n_proc += 1
-
-            if verbose and n_proc % 100 == 0:
-                print("{}/{}".format(n_proc, n_total))
+            node.p,_ = nquad(pdf, node.bounds)
 
             # If the probability is too high then split the cell and generate
             # sub-trees
             if node.p >= p_hat:
                 node.split()
                 for child in node.children:
-                    # Adding new nodes to be processed
-                    n_total += 1
-                    gen_pqt(child, n_proc, n_total)
+                    gen_pqt(child)
             else:
                 # Otherwise the node is a leaf
                 self.leaves.append(node)
 
-        gen_pqt(self.root, 0, 1)
+        gen_pqt(self.root)
         return self
 
             
@@ -131,16 +129,127 @@ class PQTDecomposition:
                 node_stack.append((child,depth+1))
         return print_str
 
+    def enclosing_leaf(self, coords):
+        def _get_leaf(node):
+            # Check all children (if any)
+            for child in node.children:
+                # Search down branch if contains coord
+                if child.encloses(coords):
+                    return _get_leaf(child)
+            return node
+        # Check if the point is enclosed by the pqt
+        if self.root.encloses(coords):
+            return _get_leaf(self.root)
+        return None
+
+    def add_point(self, coord):
+        leaf = self.enclosing_leaf(coord)
+        if not leaf:
+            return False
+        leaf.content.append(coord)
+        return True
         
+    def add_points(self, coords):
+        # Cant be run in parallel because node tree is not
+        # serializable
+        return map(self.add_point, coords)
+
+
+def plg(pd_edges, p_hat=0.01, pqt=None):
+    """ Implementation of the PLG algorithm 
+        
+        Parameters:
+        pd_edges - dictionary with pickup and delivery pairings
+        p_hat - upperbound on the probability over a leaf of the pdf
+        pqt - pass through a previously generated pdf
+
+        Returns:
+        dp_edges - lookup of computed delivery to pickup links
+        """
+    unvisited_pickups = pd_edges.keys()
+
+    # If no pqt is passed then generate one from the given points
+    if not pqt:
+        pqt = PQTDecomposition().from_points(pd_edges.keys()+pd_edges.values(), p_hat=p_hat)
+
+    # Add all pickups to the tree
+    pqt.add_points(unvisited_pickups)
+
+    dp_edges = {}
+    
+    cur_pickup = first_pickup = unvisited_pickups.pop()
+    if cur_pickup:
+        # Find the leaf to remove the pickup
+        pqt.enclosing_leaf(cur_pickup).content.remove(cur_pickup)
+
+
+    # While there are unvisited pickups
+    while unvisited_pickups:
+        # Find the next delivery
+        cur_delivery = pd_edges[cur_pickup]
+
+        cur_leaf = pqt.enclosing_leaf(cur_delivery)
+
+        if cur_leaf.content:
+            # Connect within leaf
+            cur_pickup = cur_leaf.content.pop()
+            unvisited_pickups.remove(cur_pickup)
+        # Otherwise get a random unvisited pickup
+        else:
+            # Connect to any non-local pickup
+            cur_pickup = unvisited_pickups.pop()
+            if cur_pickup:
+                # Find the leaf to remove the pickup
+                pqt.enclosing_leaf(cur_pickup).content.remove(cur_pickup)
+
+        # Add the edge
+        dp_edges[cur_delivery] = cur_pickup
+
+    # Add edge to make it a loop
+    dp_edges[pd_edges[cur_pickup]] = first_pickup
+
+    return dp_edges
+
+
+def print_cycle(pd_edges, dp_edges):
+    # Print the cycle
+    first_pickup = cur_pickup = next(key for key in pd_edges)
+    print("   P ({:.3},{:.3}) ".format(*cur_pickup))
+
+    # Do while construction
+    while True:
+        cur_delivery = pd_edges[cur_pickup]
+        cur_pickup = dp_edges[cur_delivery]
+        print("-> D ({:.4},{:.4}) ".format(*cur_delivery))
+        # Break out if back at beginning
+        if cur_pickup == first_pickup:
+            print("-> Loop")
+            break
+        else:
+            print("-> P ({:.4},{:.4})".format(*cur_pickup))
+
+
+from random import random
+def plg_test_1(n_pts = 50, verbose=False):
+    pd_edges = {(random(),random()): (random(),random()) \
+                for i in xrange(n_pts)}
+    dp_edges = plg(pd_edges, p_hat=0.01, pqt=None)
+    
+    if verbose:
+        print_cycle(pd_edges, dp_edges)
+ 
+
+
 
 if __name__ == "__main__":
-    #import random
-    #n_pts = 1000 
-    #pts = [(random.random(), random.random()) for i in xrange(n_pts)]
+    plg_test_1(verbose=True)
 
-    #decomp = PQTDecomposition().from_points(pts, p_hat=0.05)
-    def pdf(x, y):
-        return 3 * (1 - x**2 - y**2)
-    decomp = PQTDecomposition().from_pdf(pdf, p_hat=0.01, verbose=True)
-    print(decomp)
+    #decomp = PQTDecomposition().from_points(pts, p_hat=0.05, store=True)
 
+    ##def pdf(x, y):
+    ##    return 3 * (1 - x**2 - y**2)
+    ##decomp = PQTDecomposition().from_pdf(pdf, p_hat=0.01, verbose=True)
+    #print(decomp.enclosing_leaf([0.1,0.1]))
+    #print(decomp)
+
+   
