@@ -24,6 +24,7 @@ class PQTNode:
         return "PQTNode({}, {})".format(self.bounds[0], self.bounds[1])
 
     def split(self):
+        """ Adds children to the current node """
         x0, x1 = self.bounds[0]
         y0, y1 = self.bounds[1]
 
@@ -38,7 +39,14 @@ class PQTNode:
                 ]
         return self.children
 
-    def encloses(self, coord=[0.5,0.5]):
+    def encloses(self, coord):
+        """ Checks if point passed is bounded
+            Parameters:
+            coord - tuple of point
+
+            Returns:
+            whether or not enclosing
+        """
         x0, x1 = self.bounds[0]
         y0, y1 = self.bounds[1]
 
@@ -48,12 +56,16 @@ class PQTNode:
     def contains(self, coord=[0.1, 0.1]):
         return coord in self.content
 
-    def draw(self, ax):
+    def draw(self, ax, show_prob=False, p_hat=0.01):
+        """ Draws a rectangle corresponding to the cell"""
         x0, x1 = self.bounds[0]
         y0, y1 = self.bounds[1]
         ax.add_patch(patches.Rectangle((x0,y0), x1-x0, y1-y0,
-            fill=None,
-            linewidth=0.5))
+            fill=None, linewidth=0.5))
+
+        if show_prob:
+            ax.add_patch(patches.Rectangle((x0,y0), x1-x0, y1-y0,
+            linewidth=0.5, alpha=self.p/p_hat, facecolor="red"))
 
 
 class PQTDecomposition:
@@ -62,7 +74,12 @@ class PQTDecomposition:
         self.root = PQTNode()
         self.leaves = []
 
-    def from_points(self, points=[], p_hat=0.1, store=False):
+    def from_points(self, points=[], p_hat=0.01, store=False):
+        """ Initialize from points
+            Parameters:
+            points - list of sample point tuples,
+            p_hat - maximum probability of a leaf,
+        """
         n_pts = float(len(points))
         # Check that atoms do not have probability higher than p_hat, if they
         # are then we set p_hat to the probability of an atom.
@@ -91,7 +108,14 @@ class PQTDecomposition:
         gen_pqt(self.root, points)
         return self
 
-    def from_pdf(self, pdf, p_hat):
+    def from_pdf(self, pdf, p_hat=0.01):
+        """ Initialize from pdf
+            Parameters:
+            pdf - function f(x,y) with compact support contained in
+            the bounding square
+            p_hat - maximum probability of a leaf
+            """
+
         from scipy.integrate import nquad
 
         self.p_hat = p_hat
@@ -164,12 +188,17 @@ class PQTDecomposition:
         # serializable
         return map(self.add_point, coords)
 
-    def draw(self):
+    def draw(self, show_prob=False):
+        """ Draws the pqt using matplotlib
+            Parameters:
+            show_prob - whether or not probability should be displayed
+            as a shade
+            """
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
 
         for leaf in self.leaves:
-            leaf.draw(ax)
+            leaf.draw(ax, show_prob=show_prob, p_hat=self.p_hat)
 
         ax.get_xaxis().set_visible(False)
         ax.get_yaxis().set_visible(False)
@@ -177,16 +206,18 @@ class PQTDecomposition:
         ax.plot()
         plt.show()
 
+
+
 if __name__ == "__main__":
     from random import random
-    n_pts = 100
-    pts = [(random(),random()) for i in xrange(n_pts)]
-    decomp = PQTDecomposition().from_points(pts, p_hat=0.05, store=True)
+    #n_pts = 1000
+    #pts = [(random(),random()) for i in xrange(n_pts)]
+    #decomp = PQTDecomposition().from_points(pts, p_hat=0.001, store=True)
     
     def pdf(x, y):
-        return 3 * (1 - x**2 - y**2)
-    decomp = PQTDecomposition().from_pdf(pdf, p_hat=0.01)
-    #print(decomp.enclosing_leaf([0.1,0.1]))
-    #print(decomp)
+        return 3./4. * (2 - x**2 - y**2)
 
-    decomp.draw()
+    decomp = PQTDecomposition().from_pdf(pdf, p_hat=0.001)
+    empt_leaf = decomp.enclosing_leaf([0.9,0.9])
+
+    decomp.draw(show_prob=True)
