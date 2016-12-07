@@ -2,6 +2,9 @@ from __future__ import print_function
 import numpy as np
 
 
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+
 class PQTNode:
     """PQT Node class"""
     def __init__(self, bounds=[[0., 1.], [0., 1.]]):
@@ -44,6 +47,13 @@ class PQTNode:
 
     def contains(self, coord=[0.1, 0.1]):
         return coord in self.content
+
+    def draw(self, ax):
+        x0, x1 = self.bounds[0]
+        y0, y1 = self.bounds[1]
+        ax.add_patch(patches.Rectangle((x0,y0), x1-x0, y1-y0,
+            fill=None,
+            linewidth=0.5))
 
 
 class PQTDecomposition:
@@ -154,13 +164,29 @@ class PQTDecomposition:
         # serializable
         return map(self.add_point, coords)
 
+    def draw(self):
+        fig = plt.figure()
+        ax = fig.add_subplot(111, aspect='equal')
+
+        for leaf in self.leaves:
+            leaf.draw(ax)
+
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+
+        ax.plot()
+        plt.show()
 
 if __name__ == "__main__":
-    pass
-    #decomp = PQTDecomposition().from_points(pts, p_hat=0.05, store=True)
+    from random import random
+    n_pts = 100
+    pts = [(random(),random()) for i in xrange(n_pts)]
+    decomp = PQTDecomposition().from_points(pts, p_hat=0.05, store=True)
     
-    ##def pdf(x, y):
-    ##    return 3 * (1 - x**2 - y**2)
-    ##decomp = PQTDecomposition().from_pdf(pdf, p_hat=0.01, verbose=True)
+    def pdf(x, y):
+        return 3 * (1 - x**2 - y**2)
+    decomp = PQTDecomposition().from_pdf(pdf, p_hat=0.01)
     #print(decomp.enclosing_leaf([0.1,0.1]))
     #print(decomp)
+
+    decomp.draw()
