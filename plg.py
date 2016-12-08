@@ -1,6 +1,7 @@
 from __future__ import print_function
-import numpy as np
-from pqt import PQTDecomposition, PQTNode
+from pqt import PQTDecomposition
+from helper_functions import *
+
 
 def plg(pd_edges, p_hat=0.01, pqt=None):
     """ Implementation of the PLG algorithm 
@@ -12,41 +13,43 @@ def plg(pd_edges, p_hat=0.01, pqt=None):
         Returns:
         dp_edges - lookup of computed delivery to pickup links
         """
-    unvisited_pickups = pd_edges.keys()
+    pickups = pd_edges.keys()
+    deliveries = pd_edges.values()
 
     # If no pqt is passed then generate one from the given points
     if not pqt:
-        pqt = PQTDecomposition().from_points(pd_edges.keys()+pd_edges.values(), p_hat=p_hat)
+        pqt = PQTDecomposition().from_points(pickups, p_hat=p_hat)
 
     # Add all pickups to the tree
-    pqt.add_points(unvisited_pickups)
+    pqt.add_points(pickups, 'p')
 
     dp_edges = {}
     
-    cur_pickup = first_pickup = unvisited_pickups.pop()
+    cur_pickup = first_pickup = pickups.pop()
     if cur_pickup:
         # Find the leaf to remove the pickup
-        pqt.enclosing_leaf(cur_pickup).content.remove(cur_pickup)
+        pqt.enclosing_leaf(cur_pickup).content['p'].remove(cur_pickup)
 
 
     # While there are unvisited pickups
-    while unvisited_pickups:
+    while pickups:
         # Find the next delivery
         cur_delivery = pd_edges[cur_pickup]
 
         cur_leaf = pqt.enclosing_leaf(cur_delivery)
 
-        if cur_leaf.content:
+        # Use any local pickup if they exist
+        if cur_leaf.content['p']:
             # Connect within leaf
-            cur_pickup = cur_leaf.content.pop()
-            unvisited_pickups.remove(cur_pickup)
+            cur_pickup = cur_leaf.content['p'].pop()
+            pickups.remove(cur_pickup)
         # Otherwise get a random unvisited pickup
         else:
             # Connect to any non-local pickup
-            cur_pickup = unvisited_pickups.pop()
+            cur_pickup = pickups.pop()
             if cur_pickup:
                 # Find the leaf to remove the pickup
-                pqt.enclosing_leaf(cur_pickup).content.remove(cur_pickup)
+                pqt.enclosing_leaf(cur_pickup).content['p'].remove(cur_pickup)
 
         # Add the edge
         dp_edges[cur_delivery] = cur_pickup
@@ -58,28 +61,8 @@ def plg(pd_edges, p_hat=0.01, pqt=None):
     return dp_edges
 
 
-def print_cycle(pd_edges, dp_edges):
-    # Print the cycle
-    first_pickup = cur_pickup = next(key for key in pd_edges)
-    print("   P ({:.3},{:.3}) ".format(*cur_pickup))
-
-    # Do while construction
-    while True:
-        cur_delivery = pd_edges[cur_pickup]
-        cur_pickup = dp_edges[cur_delivery]
-        print("-> D ({:.4},{:.4}) ".format(*cur_delivery))
-        # Break out if back at beginning
-        if cur_pickup == first_pickup:
-            print("-> Loop")
-            break
-        else:
-            print("-> P ({:.4},{:.4})".format(*cur_pickup))
-
-
-from random import random
-def plg_test_1(n_pairs = 50, verbose=False):
-    pd_edges = {(random(),random()): (random(),random()) \
-                for i in xrange(n_pairs)}
+def plg_test_1(n_pairs=50, verbose=False):
+    pd_edges = gen_pd_edges(n_pairs=n_pairs)
     dp_edges = plg(pd_edges, p_hat=0.0025, pqt=None)
     
     if verbose:
@@ -89,7 +72,7 @@ def plg_test_1(n_pairs = 50, verbose=False):
 
 
 if __name__ == "__main__":
-    plg_test_1(n_pairs=20000,verbose=False)
+    plg_test_1(n_pairs=10000, verbose=True)
 
 
     #decomp = PQTDecomposition().from_points(pts, p_hat=0.05, store=True)

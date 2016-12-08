@@ -1,6 +1,7 @@
 from __future__ import print_function
 import numpy as np
 
+from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -10,7 +11,7 @@ class PQTNode:
     def __init__(self, bounds=[[0., 1.], [0., 1.]]):
         self.children = []
         self.bounds = bounds 
-        self.content = []
+        self.content = defaultdict(list)
         self.p = 0.
 
     def __str__(self):
@@ -18,7 +19,7 @@ class PQTNode:
                                                      self.bounds[0][1],
                                                      self.bounds[1][0],
                                                      self.bounds[1][1]) \
-              + "{} pts {} chldrn {:.3} prb".format(len(self.content), len(self.children), self.p)
+              + "{} chldrn {:.3} prb".format(len(self.children), self.p)
 
     def __repr__(self):
         return "PQTNode({}, {})".format(self.bounds[0], self.bounds[1])
@@ -53,9 +54,6 @@ class PQTNode:
         return x0 <= coord[0] < x1 \
            and y0 <= coord[1] < y1
 
-    def contains(self, coord=[0.1, 0.1]):
-        return coord in self.content
-
     def draw(self, ax, show_prob=False, p_hat=0.01):
         """ Draws a rectangle corresponding to the cell"""
         x0, x1 = self.bounds[0]
@@ -74,7 +72,7 @@ class PQTDecomposition:
         self.root = PQTNode()
         self.leaves = []
 
-    def from_points(self, points=[], p_hat=0.01, store=False):
+    def from_points(self, points=[], p_hat=0.01):
         """ Initialize from points
             Parameters:
             points - list of sample point tuples,
@@ -100,9 +98,6 @@ class PQTDecomposition:
             else:
                 # Otherwise the node is a leaf, so add it
                 self.leaves.append(node)
-                # Store points if set
-                if store:
-                    node.content = pts
 
         # Start recursion through the root node
         gen_pqt(self.root, points)
@@ -176,17 +171,17 @@ class PQTDecomposition:
             return _get_leaf(self.root)
         return None
 
-    def add_point(self, coord):
+    def add_point(self, coord, attr='pts'):
         leaf = self.enclosing_leaf(coord)
         if not leaf:
             return False
-        leaf.content.append(coord)
+        leaf.content[attr].append(coord)
         return True
         
-    def add_points(self, coords):
-        # Cant be run in parallel because node tree is not
-        # serializable
-        return map(self.add_point, coords)
+    def add_points(self, coords, attr='pts'):
+        all_suc = True
+        for coord in coords:
+            all_suc &= self.add_point(coord, attr=attr)
 
     def draw(self, show_prob=False):
         """ Draws the pqt using matplotlib
