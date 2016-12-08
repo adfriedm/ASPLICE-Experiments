@@ -20,7 +20,6 @@ def pts_str(pts):
 def splice_alg(pd_edges, p_hat=0.01):
     """ Implementation of the SPLICE algorithm
     """
-    start_time = time.clock()
     pickups = pd_edges.keys()
     deliveries = pd_edges.values()
 
@@ -63,50 +62,8 @@ def splice_alg(pd_edges, p_hat=0.01):
     cost += reduce(lambda a, b: a + dist.euclidean(b,dp_edges[b]),
             dp_edges, 0)
 
-    stop_time = time.clock()
-
-    return dp_edges, cost, (stop_time - start_time)
+    return dp_edges, cost
     
     
-
-
-
-def splice_convergence_test():
-    res = defaultdict(list)
-    res['exp_time'] = time.strftime("%Y_%m_%D_%H_%M_%S", time.gmtime())
-    # Parameters
-    n_pairs_l = 20
-    n_pairs_h = 23
-    n_reps = 20
-
-    # Counters
-    sample = 0
-
-    # Run experiment
-    for n_pairs in xrange(20, 23):
-        for rep in xrange(20):
-            pd_edges = gen_pd_edges(n_pairs=n_pairs)
-            sample += 1
-            dp_edges, cost, _time = splice_alg(pd_edges)
-            res['sample'].append(sample)
-            res['cost'].append(cost)
-            res['time'].append(_time)
-            res['n_pairs'].append(n_pairs)
-
-    map(lambda a,b,c,d: print("sample: {} cost: {:.3} time: {:.6} n_pairs {}".format(a,b,c,d)),
-        res['sample'],
-        res['cost'],
-        res['time'],
-        res['n_pairs'] )
-
-    # Pickle the results and store them 
-    sdir_name = "splice-conv-test/"
-    sfile_name = "splice-res_{}.pickle".format(res['exp_time'])
-
-    pickle.dump(res, open(sdir_name+sfile_name, "wb"))
-
-
 if __name__ == "__main__":
-
-    splice_convergence_test()
-
+    pass
