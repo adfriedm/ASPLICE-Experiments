@@ -24,12 +24,13 @@ def splice_convergence_run(params=[(10,10),(20,10)]):
     sample = 0
 
     # Run experiment
-    for (n_pairs, n_reps) in params:
-        # 
-
+    for i,(n_pairs, n_reps) in enumerate(params):
+        print("\nConfig ({} / {}) ".format(i, len(params)))
+        sys.stdout.flush()
         for rep in xrange(n_reps):
             print("{} pairs with rep ({}/{})".format(n_pairs, rep+1, n_reps))
             sys.stdout.flush()
+
             pd_edges = gen_pd_edges(n_pairs=n_pairs)
             sample += 1
 
@@ -44,6 +45,9 @@ def splice_convergence_run(params=[(10,10),(20,10)]):
             res['time'].append(stop_time - start_time)
             res['n_pairs'].append(n_pairs)
 
+            print("Completed in {} seconds".format(stop_time -
+                start_time))
+            sys.stdout.flush()
 
     return res
 
@@ -66,8 +70,8 @@ def splice_convergence_exp1(res):
 
 if __name__ == "__main__":
 
-    res = splice_convergence_run([(int(n_samp), 2) for n_samp in
-            np.logspace(1.0, 3.0, num=20)])
+    res = splice_convergence_run([(int(n_samp), 4) for n_samp in
+            np.logspace(1.0, 2.35, num=20)])
             
            
     save_res(res, file_pre="splice-conv",

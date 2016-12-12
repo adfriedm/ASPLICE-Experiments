@@ -3,7 +3,7 @@ from pqt import PQTDecomposition
 from helper_functions import *
 
 
-def plg(pd_edges, p_hat=0.01, pqt=None):
+def plg_alg(pd_edges, p_hat=0.01, pqt=None):
     """ Implementation of the PLG algorithm 
         Parameters:
         pd_edges - dictionary with pickup and delivery pairings
