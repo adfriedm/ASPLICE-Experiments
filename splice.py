@@ -23,19 +23,28 @@ def splice_alg(pd_edges, p_hat=0.01):
     pickups = pd_edges.keys()
     deliveries = pd_edges.values()
 
-    cost = 0.
-
     # Compute Hungarian matching indices
     c_mat = dist.cdist(deliveries, pickups)
     # Connect dp_edges according to bipartite matching
     dp_edges = {deliveries[d_ind]: pickups[p_ind] \
                 for (d_ind, p_ind) in Munkres().compute(c_mat)}
+    # Merge generated tours
+    cost = merge_tours(pd_edges, dp_edges)
 
+    return dp_edges, cost
+
+
+def merge_tours(pd_edges, dp_edges, dist_f=dist.euclidean):
+    cost = 0.
+    pickups = pd_edges.keys()
+    deliveries = pd_edges.values()
+
+    # Setup beginning of merge
     cur_p = pickups.pop()
     tour_p = cur_p
     start_p = cur_p
 
-    #import pdb; pdb.set_trace()
+    # While there are remaining pickups
     while pickups:
         # Follow through the d->p chain
         cur_d = pd_edges[cur_p]
@@ -62,8 +71,11 @@ def splice_alg(pd_edges, p_hat=0.01):
     cost += reduce(lambda a, b: a + dist.euclidean(b,dp_edges[b]),
             dp_edges, 0)
 
-    return dp_edges, cost
+    return cost
     
-    
+
+
+
+
 if __name__ == "__main__":
     pass

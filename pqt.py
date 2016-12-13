@@ -65,6 +65,8 @@ class PQTNode:
             ax.add_patch(patches.Rectangle((x0,y0), x1-x0, y1-y0,
             linewidth=0.5, alpha=self.p/p_hat, facecolor="red"))
 
+    def center(self):
+        return [0.5*sum(self.bounds[0]), 0.5*sum(self.bounds[1])]
 
 class PQTDecomposition:
     """PQT Decomposition data structure class"""
