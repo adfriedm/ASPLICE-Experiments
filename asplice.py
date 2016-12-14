@@ -131,7 +131,7 @@ def merge_tours(pd_edges, dp_edges, dist_f=dist.euclidean):
 
 def asplice_test_1(n_pairs=100, verbose=False):
     pd_edges = gen_pd_edges(n_pairs=n_pairs)
-    dp_edges, cost = asplice_alg(pd_edges, p_hat=0.01, pqt=None)
+    dp_edges, cost = asplice_alg(pd_edges, p_hat=0.0025, pqt=None)
     
     print("Cost: {}".format(cost))
 
