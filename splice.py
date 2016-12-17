@@ -17,7 +17,7 @@ def pt_str(pt):
 def pts_str(pts):
     return ", ".join(map(lambda pt: pt_str(pt), pts))
 
-def splice_alg(pd_edges, p_hat=0.01):
+def splice_alg(pd_edges):
     """ Implementation of the SPLICE algorithm
     """
     pickups = pd_edges.keys()

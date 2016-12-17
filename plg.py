@@ -2,6 +2,9 @@ from __future__ import print_function
 from pqt import PQTDecomposition
 from helper_functions import *
 
+import scipy.spatial.distance as dist
+
+
 
 def plg_alg(pd_edges, p_hat=0.01, pqt=None):
     """ Implementation of the PLG algorithm 
@@ -12,6 +15,7 @@ def plg_alg(pd_edges, p_hat=0.01, pqt=None):
 
         Returns:
         dp_edges - lookup of computed delivery to pickup links
+        cost - the total cost of the resulting tour
         """
     pickups = pd_edges.keys()
     deliveries = pd_edges.values()
@@ -29,7 +33,6 @@ def plg_alg(pd_edges, p_hat=0.01, pqt=None):
     if cur_pickup:
         # Find the leaf to remove the pickup
         pqt.enclosing_leaf(cur_pickup).content['p'].remove(cur_pickup)
-
 
     # While there are unvisited pickups
     while pickups:
@@ -57,8 +60,14 @@ def plg_alg(pd_edges, p_hat=0.01, pqt=None):
     # Add edge to make it a loop
     dp_edges[pd_edges[cur_pickup]] = first_pickup
 
-    print(len(pqt.leaves))
-    return dp_edges
+    # Sum over all pd and dp edge costs
+    cost = reduce(lambda a, b: a + dist.euclidean(b,pd_edges[b]), pd_edges, 0)
+    cost += reduce(lambda a, b: a + dist.euclidean(b,dp_edges[b]), dp_edges, 0)
+
+    return dp_edges, cost
+
+
+
 
 
 def plg_test_1(n_pairs=50, verbose=False):
@@ -69,18 +78,5 @@ def plg_test_1(n_pairs=50, verbose=False):
         print_cycle(pd_edges, dp_edges)
  
 
-
-
 if __name__ == "__main__":
     plg_test_1(n_pairs=10000, verbose=True)
-
-
-    #decomp = PQTDecomposition().from_points(pts, p_hat=0.05, store=True)
-
-    ##def pdf(x, y):
-    ##    return 3 * (1 - x**2 - y**2)
-    ##decomp = PQTDecomposition().from_pdf(pdf, p_hat=0.01, verbose=True)
-    #print(decomp.enclosing_leaf([0.1,0.1]))
-    #print(decomp)
-
-   

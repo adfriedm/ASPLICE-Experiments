@@ -1,2 +1,3 @@
 *.pyc
 results/splice-conv-test/*
+dist2d.py
